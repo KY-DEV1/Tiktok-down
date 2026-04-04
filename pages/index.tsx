@@ -1,20 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
-import '@/styles/globals.css'
-import Head from 'next/head'
 
-export default function App({ Component, pageProps }) {
+export default function Home() {
+  const [dark, setDark] = useState(true);
+
   return (
-    <>
-      <Head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </Head>
-      <Component {...pageProps} />
-    </>
-  )
+    <div className={`tiktok-downloader ${dark ? "dark" : "light"}`}>
+      
+      <div style={{ padding: "20px" }}>
+        
+        <button onClick={() => setDark(!dark)}>
+          Toggle Theme 🌗
+        </button>
+
+        <div className="card fade-in slide-up" style={{ marginTop: "20px" }}>
+          <h2>TikTok Downloader</h2>
+          <input placeholder="Paste link TikTok di sini..." />
+          <br /><br />
+          <button>Download</button>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 
 interface DownloadData {
