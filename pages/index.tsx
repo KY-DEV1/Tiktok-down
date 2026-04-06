@@ -360,7 +360,12 @@ const downloadAllImages = async (images: string[], title: string) => {
         {/* Top Bar */}
         <div className="top-bar">
           <div className="logo">
-            <div className="logo-icon">⬇️</div>
+            <div className="logo-icon">
+  <img 
+    src="https://uploader-omega-opal.vercel.app/file/BQACAgUAAxkDAAMWadM-qxzsizP6Gbly-ZB3ILz2iKEAAs8eAAIZ4phWhwvL9mYRcJk7BA" 
+    alt="logo"
+  />
+</div>
             <h1 className="title">TikTok Downloader</h1>
           </div>
 
