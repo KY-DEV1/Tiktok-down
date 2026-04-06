@@ -1,135 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-/*  Base */
 body {
-  font-family: 'Poppins', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/*  Smooth transition */
-* {
+.tiktok-downloader {
+  min-height: 100vh;
+  padding: 20px;
   transition: all 0.3s ease;
 }
 
-/*  DARK MODE */
 .tiktok-downloader.dark {
-  background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364, #1c1c1c);
-  background-size: 400% 400%;
-  animation: gradientMove 12s ease infinite;
-  min-height: 100vh;
-  color: white;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
 }
 
-/*  LIGHT MODE */
 .tiktok-downloader.light {
-  background: linear-gradient(-45deg, #ff9a9e, #fad0c4, #a18cd1, #fbc2eb);
-  background-size: 400% 400%;
-  animation: gradientMove 12s ease infinite;
-  min-height: 100vh;
-  color: #333;
-}
-
-/* CARD */
-.card {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(20px);
-  border-radius: 24px;
-  padding: 25px;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-}
-
-/*  BUTTON */
-button {
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, #ff416c, #ff4b2b);
-  border: none;
-  padding: 12px 20px;
-  border-radius: 14px;
-  color: white;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-button:hover {
-  transform: scale(1.07);
-  box-shadow: 0 8px 25px rgba(255, 75, 43, 0.5);
-}
-
-/* 💥 Ripple effect */
-button::after {
-  content: "";
-  position: absolute;
-  width: 0;
-  height: 0;
-  background: rgba(255,255,255,0.4);
-  border-radius: 50%;
-  opacity: 0;
-  pointer-events: none;
-}
-
-button:active::after {
-  width: 200px;
-  height: 200px;
-  opacity: 1;
-  transition: 0s;
-}
-
-/* 📦 INPUT */
-input {
-  background: rgba(255,255,255,0.1);
-  border: none;
-  padding: 12px;
-  border-radius: 10px;
-  color: inherit;
-  outline: none;
-}
-
-input::placeholder {
-  color: rgba(255,255,255,0.6);
-}
-
-input:focus {
-  transform: scale(1.02);
-  box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
-}
-
-/* 🎬 Animations */
-.fade-in {
-  animation: fadeIn 0.8s ease forwards;
-}
-
-.slide-up {
-  animation: slideUp 0.8s ease forwards;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateY(30px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-/* 🌊 Gradient Animation */
-@keyframes gradientMove {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .container {
@@ -228,6 +120,15 @@ input:focus {
   margin-bottom: 30px;
   font-weight: 300;
   text-align: center;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 .input-group {
