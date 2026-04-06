@@ -47,8 +47,8 @@ body {
 }
 
 .logo-icon {
-  width: 150px;
-  height: 150px;
+  width:  10px;
+  height: 10px;
   object-fit: cover;
   border-radius: 12px;
   display: flex;
