@@ -17,11 +17,11 @@ body {
 }
 
 .tiktok-downloader.dark {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  background: linear-gradient(135deg, #1e3c72 0%, #0ea5e9 100%);
 }
 
 .tiktok-downloader.light {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #f9fafb 0%, #764ba2 100%);
 }
 
 .container {
