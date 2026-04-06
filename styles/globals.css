@@ -49,14 +49,12 @@ body {
 .logo-icon {
   width: 50px;
   height: 50px;
-  background: linear-gradient(45deg, #ff0050, #00f2ea);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  color: white;
-  font-weight: bold;
+  overflow: hidden; /* penting */
+  background: transparent; /* 🔥 hapus gradient */
 }
 
 .title {
