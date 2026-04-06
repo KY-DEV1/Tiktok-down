@@ -1,29 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-
-export default function Home() {
-  const [dark, setDark] = useState(true);
-
-  return (
-    <div className={`tiktok-downloader ${dark ? "dark" : "light"}`}>
-      
-      <div style={{ padding: "20px" }}>
-        
-        <button onClick={() => setDark(!dark)}>
-          Toggle Theme 🌗
-        </button>
-
-        <div className="card fade-in slide-up" style={{ marginTop: "20px" }}>
-          <h2>TikTok Downloader</h2>
-          <input placeholder="Paste link TikTok di sini..." />
-          <br /><br />
-          <button>Download</button>
-        </div>
-
-      </div>
-    </div>
-  );
-}
 
 interface DownloadData {
   type: 'video' | 'image' | 'audio';
