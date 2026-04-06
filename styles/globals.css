@@ -47,15 +47,17 @@ body {
 }
 
 .logo-icon {
-  width:  10px;
-  height: 10px;
-  object-fit: cover;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden; /* penting */
-  background: transparent; /* 🔥 hapus gradient */
+  overflow: hidden;
+  background: transparent;
+}
+
+.logo-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .title {
@@ -464,8 +466,4 @@ body {
   }
   }
 
-.logo-icon img {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-}
+
