@@ -40,985 +40,351 @@ export default function TikTokDownloader() {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const mediaTypes: MediaOption[] = [
-    {
-      id: 'video',
-      label: 'Video',
-      icon: '🎬',
-      description: 'Download video dengan kualitas HD'
-    },
-    {
-      id: 'audio',
-      label: 'Audio',
-      icon: '🎵',
-      description: 'Ekstrak audio saja (format MP3)'
-    },
-    {
-      id: 'image',
-      label: 'Gambar',
-      icon: '🖼️',
-      description: 'Download thumbnail/gambar'
-    }
+    { id: 'video', label: 'Video', icon: '▶', description: 'HD tanpa watermark' },
+    { id: 'audio', label: 'Audio', icon: '♪', description: 'Ekstrak audio MP3' },
+    { id: 'image', label: 'Gambar', icon: '⊞', description: 'Download thumbnail' },
   ];
 
-  // Helper functions
-  const getMediaIcon = (type: string) => {
-    switch (type) {
-      case 'video': return '🎬';
-      case 'audio': return '🎵';
-      case 'image': return '🖼️';
-      default: return '📁';
-    }
-  };
+  const getMediaIcon = (type: string) => ({ video: '▶', audio: '♪', image: '⊞' }[type] || '⊡');
+  const getMediaLabel = (type: string) => ({ video: 'Video', audio: 'Audio', image: 'Gambar' }[type] || 'Media');
 
-  const getMediaLabel = (type: string) => {
-    switch (type) {
-      case 'video': return 'Video';
-      case 'audio': return 'Audio';
-      case 'image': return 'Gambar';
-      default: return 'Media';
-    }
-  };
-
-  // Load from localStorage
   useEffect(() => {
     const savedTheme = localStorage.getItem('darkMode');
     const savedHistory = localStorage.getItem('downloadHistory');
-    
     if (savedTheme) setDarkMode(JSON.parse(savedTheme));
     if (savedHistory) setDownloadHistory(JSON.parse(savedHistory));
   }, []);
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem('darkMode', JSON.stringify(darkMode));
-  }, [darkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('downloadHistory', JSON.stringify(downloadHistory));
-  }, [downloadHistory]);
+  useEffect(() => { localStorage.setItem('darkMode', JSON.stringify(darkMode)); }, [darkMode]);
+  useEffect(() => { localStorage.setItem('downloadHistory', JSON.stringify(downloadHistory)); }, [downloadHistory]);
 
   const handleDownload = async () => {
-    if (!url.trim()) {
-      setError('Masukkan URL TikTok');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setDownloadData(null);
-    setDownloadError('');
-
+    if (!url.trim()) { setError('Masukkan URL TikTok terlebih dahulu'); return; }
+    setLoading(true); setError(''); setDownloadData(null); setDownloadError('');
     try {
-      const response = await axios.post('/api/download', { 
-        url,
-        mediaType: selectedMedia 
-      });
-      
+      const response = await axios.post('/api/download', { url, mediaType: selectedMedia });
       if (response.data.success) {
-        const downloadItem = {
-          ...response.data.data,
-          timestamp: Date.now()
-        };
-        
-        setDownloadData(downloadItem);
-        
-        // Add to history
-        const newHistoryItem: DownloadHistory = {
+        const item = { ...response.data.data, timestamp: Date.now() };
+        setDownloadData(item);
+        const newHistory: DownloadHistory = {
           id: Date.now().toString(),
-          url: downloadItem.images ? downloadItem.images[0] : downloadItem.url,
-          title: downloadItem.title || 'TikTok Media',
-          thumbnail: downloadItem.thumbnail,
-          timestamp: downloadItem.timestamp,
-          type: downloadItem.type
+          url: item.images ? item.images[0] : item.url,
+          title: item.title || 'TikTok Media',
+          thumbnail: item.thumbnail,
+          timestamp: item.timestamp,
+          type: item.type,
         };
-        
-        setDownloadHistory(prev => [newHistoryItem, ...prev.slice(0, 49)]);
+        setDownloadHistory(prev => [newHistory, ...prev.slice(0, 49)]);
       } else {
         setError(response.data.error || 'Gagal mengambil data');
       }
     } catch (err: any) {
-      console.error('Download error:', err);
-      if (err.response?.data?.error) {
-        setError(err.response.data.error);
-      } else {
-        setError('Terjadi kesalahan saat memproses video');
-      }
+      setError(err.response?.data?.error || 'Terjadi kesalahan saat memproses video');
     } finally {
       setLoading(false);
     }
   };
 
   const handleFileDownload = async (downloadUrl: string, filename: string) => {
-  let originalText = ''; // Deklarasi variable di luar try-catch
-  
-  try {
-    if (!downloadUrl || !downloadUrl.startsWith('http')) {
-      setDownloadError('URL download tidak valid');
-      return;
+    if (!downloadUrl?.startsWith('http')) { setDownloadError('URL download tidak valid'); return; }
+    setDownloadError(''); setIsDownloading(true);
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const response = await fetch(downloadUrl, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': '*/*', 'Referer': 'https://www.tiktok.com/' },
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) throw new Error(`Error ${response.status}`);
+      const blob = await response.blob();
+      if (blob.size === 0) throw new Error('File kosong (0 bytes)');
+      if (blob.type.includes('text/html')) throw new Error('URL mengembalikan halaman web');
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl; a.download = filename; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch (err: any) {
+      let msg = 'Gagal mengunduh: ';
+      if (err.name === 'AbortError') msg += 'Timeout (45 detik).';
+      else if (err.message.includes('Failed to fetch')) msg += 'Tidak dapat terhubung ke server.';
+      else msg += err.message;
+      setDownloadError(msg);
+      window.open(downloadUrl, '_blank');
+    } finally {
+      setIsDownloading(false);
     }
+  };
 
-    // Reset error dan set downloading state
-    setDownloadError('');
-    setIsDownloading(true);
-
-    // Show loading for download
-    const downloadBtn = document.getElementById('download-btn');
-    if (downloadBtn) {
-      originalText = downloadBtn.innerHTML; // Simpan text asli
-      downloadBtn.innerHTML = '⬇️ Mengunduh...';
-      downloadBtn.setAttribute('disabled', 'true');
-    }
-
-    // Use fetch dengan timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
-
-    console.log('Starting download from:', downloadUrl);
-
-    const response = await fetch(downloadUrl, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': '*/*',
-        'Referer': 'https://www.tiktok.com/'
-      }
-    });
-    
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Server mengembalikan error: ${response.status} ${response.statusText}`);
-    }
-
-    const blob = await response.blob();
-    
-    // Check if blob is valid
-    if (blob.size === 0) {
-      throw new Error('File yang didownload kosong (0 bytes)');
-    }
-
-    // Check file type
-    const fileType = blob.type;
-    if (fileType.includes('text/html') || fileType.includes('application/json')) {
-      throw new Error('URL mengembalikan halaman web, bukan file media');
-    }
-
-    console.log('Download successful, file size:', blob.size, 'bytes');
-
-    const blobUrl = URL.createObjectURL(blob);
-
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = filename;
-    a.style.display = 'none';
-    
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    // Cleanup
-    setTimeout(() => {
-      URL.revokeObjectURL(blobUrl);
-    }, 1000);
-
-    // Success feedback
-    setDownloadError('');
-
-  } catch (err: any) {
-    console.error('Download error:', err);
-    
-    let errorMessage = 'Gagal mengunduh file: ';
-    
-    if (err.name === 'AbortError') {
-      errorMessage += 'Download timeout (45 detik). File mungkin terlalu besar atau koneksi lambat.';
-    } else if (err.message.includes('Failed to fetch')) {
-      errorMessage += 'Tidak dapat terhubung ke server. Cek koneksi internet Anda.';
-    } else if (err.message.includes('CORS')) {
-      errorMessage += 'Terhalang oleh kebijakan keamanan browser.';
-    } else if (err.message.includes('0 bytes')) {
-      errorMessage += 'File yang didownload kosong. URL mungkin tidak valid.';
-    } else if (err.message.includes('halaman web')) {
-      errorMessage += 'URL mengarah ke halaman web, bukan file media.';
-    } else {
-      errorMessage += err.message || 'Unknown error occurred';
-    }
-    
-    setDownloadError(errorMessage);
-    
-    // Fallback: open in new tab
-    console.log('Trying fallback: open in new tab');
-    window.open(downloadUrl, '_blank');
-    
-  } finally {
-    // Reset states
-    setIsDownloading(false);
-    
-    // Reset button
-    const downloadBtn = document.getElementById('download-btn');
-    if (downloadBtn) {
-      downloadBtn.innerHTML = originalText || '⬇️ Download Ulang';
-      downloadBtn.removeAttribute('disabled');
-    }
-  }
-};
-  
-  // Function untuk download semua images dengan progress
-const downloadAllImages = async (images: string[], title: string) => {
-  try {
-    setDownloadError('');
-    setIsDownloading(true);
-
-    let successCount = 0;
-    let failedCount = 0;
-
+  const downloadAllImages = async (images: string[], title: string) => {
+    setDownloadError(''); setIsDownloading(true);
+    let fail = 0;
     for (let i = 0; i < images.length; i++) {
-      const imageUrl = images[i];
-      const filename = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_gambar_${i + 1}.jpg`;
-      
       try {
-        console.log(`Downloading image ${i + 1}/${images.length}:`, filename);
-        
-        const response = await fetch(imageUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        
-        const blob = await response.blob();
-        if (blob.size === 0) throw new Error('File kosong');
-
+        const r = await fetch(images[i]);
+        if (!r.ok) throw new Error();
+        const blob = await r.blob();
+        if (blob.size === 0) throw new Error();
         const blobUrl = URL.createObjectURL(blob);
-
         const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = filename;
-        a.style.display = 'none';
-        
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-
-        // Cleanup
+        a.href = blobUrl; a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}_${i + 1}.jpg`;
+        a.style.display = 'none'; document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        
-        successCount++;
-        
-      } catch (err) {
-        console.error(`Failed to download image ${i + 1}:`, err);
-        failedCount++;
-      }
-      
-      // Small delay between downloads
-      if (i < images.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
+      } catch { fail++; }
+      if (i < images.length - 1) await new Promise(r => setTimeout(r, 300));
     }
-
-    // Show summary
-    if (failedCount === 0) {
-      setDownloadError('');
-    } else {
-      setDownloadError(
-        `Download selesai: ${successCount} berhasil, ${failedCount} gagal. ` +
-        `Gambar yang gagal bisa didownload manual satu per satu.`
-      );
-    }
-    
-  } catch (err: any) {
-    console.error('Download images error:', err);
-    setDownloadError(`Gagal mengunduh gambar: ${err.message}`);
-  } finally {
+    if (fail > 0) setDownloadError(`${images.length - fail} berhasil, ${fail} gagal.`);
     setIsDownloading(false);
-  }
-};
+  };
 
   const getFilename = (type: string, title?: string) => {
-    const baseName = title ? title.replace(/[^a-zA-Z0-9]/g, '_') : 'tiktok';
-    const extensions = {
-      video: 'mp4',
-      audio: 'mp3',
-      image: 'jpg'
-    };
-    return `${baseName}_${Date.now()}.${extensions[type as keyof typeof extensions] || 'mp4'}`;
+    const base = title ? title.replace(/[^a-zA-Z0-9]/g, '_') : 'tiktok';
+    return `${base}_${Date.now()}.${type === 'audio' ? 'mp3' : type === 'image' ? 'jpg' : 'mp4'}`;
   };
 
-  const validateDownloadUrl = (url: string): string | null => {
-    if (!url) return 'URL tidak boleh kosong';
-    if (!url.startsWith('http')) return 'URL harus dimulai dengan http:// atau https://';
-    return null;
-  };
+  const formatTime = (ts: number) => new Date(ts).toLocaleString('id-ID');
 
-  const clearHistory = () => {
-    setDownloadHistory([]);
-  };
-
-  const formatTime = (timestamp: number) => {
-    return new Date(timestamp).toLocaleString('id-ID');
-  };
+  const labelBtn = (t: string) => `Unduh ${getMediaLabel(t)}`;
 
   return (
     <div className={`tiktok-downloader ${darkMode ? 'dark' : 'light'}`}>
       <div className="container">
-        
-        {/* Top Bar */}
+
+        {/* ── Top Bar ─────────────────────────────────────── */}
         <div className="top-bar">
           <div className="logo">
-            <div className="logo-icon">⬇️</div>
-            <h1 className="title">TikTok Downloader</h1>
+            <div className="logo-icon">↓</div>
+            <h1 className="title">TikTok&nbsp;Down</h1>
           </div>
-
           <div className="controls">
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              className="btn btn-secondary"
-            >
-              📜 {showHistory ? 'Sembunyikan' : 'Riwayat'} 
-              {downloadHistory.length > 0 && ` (${downloadHistory.length})`}
+            <button onClick={() => setShowHistory(!showHistory)} className="btn btn-secondary">
+              ≡&nbsp;{showHistory ? 'Sembunyikan' : 'Riwayat'}
+              {downloadHistory.length > 0 && <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }}>{downloadHistory.length}</span>}
             </button>
-
-            <a
-              href="/api-docs"
-              className="btn btn-secondary"
-              style={{ textDecoration: 'none' }}
-            >
-              📡 API Docs
-            </a>
-
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="btn btn-secondary"
-            >
-              {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+            <button onClick={() => setDarkMode(!darkMode)} className="btn btn-secondary">
+              {darkMode ? '◑ Light' : '● Dark'}
             </button>
           </div>
         </div>
 
         <div className={`main-grid ${showHistory ? 'with-history' : ''}`}>
-          
-          {/* Main Content */}
           <div className="main-content">
-            <p className="subtitle">
-              Download video, audio, dan gambar dari TikTok • Cepat & Gratis
-            </p>
+            <p className="subtitle">Video · Audio · Gambar — Tanpa watermark, selamanya gratis</p>
 
-            {/* Media Type Selection */}
+            {/* ── Media Type ─────────────────────────────── */}
             <div className="card">
-              <h3 className="success-title" style={{ textAlign: 'center', marginBottom: '20px' }}>
-                📁 Pilih Jenis Media
-              </h3>
-              
+              <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                Pilih format
+              </p>
               <div className="features-grid">
-                {mediaTypes.map((media) => (
-                  <div 
-                    key={media.id}
-                    className={`feature-card ${selectedMedia === media.id ? 'selected-media' : ''}`}
-                    style={{
-                      border: selectedMedia === media.id ? '2px solid #00f2ea' : '1px solid rgba(255, 255, 255, 0.1)',
-                      background: selectedMedia === media.id ? 'rgba(0, 242, 234, 0.1)' : 'rgba(255, 255, 255, 0.05)',
-                      cursor: 'pointer',
-                      transition: 'all 0.3s ease'
-                    }}
-                    onClick={() => setSelectedMedia(media.id)}
+                {mediaTypes.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`feature-card${selectedMedia === m.id ? ' selected-media' : ''}`}
+                    onClick={() => setSelectedMedia(m.id)}
+                    style={{ cursor: 'pointer' }}
                   >
-                    <div className="feature-icon">{media.icon}</div>
-                    <h4 className="feature-title">{media.label}</h4>
-                    <p className="feature-desc">{media.description}</p>
+                    <div className="feature-icon" style={{ fontSize: '1.4rem', fontWeight: 700, fontFamily: 'monospace', color: selectedMedia === m.id ? 'var(--accent)' : 'var(--text-secondary)' }}>{m.icon}</div>
+                    <h4 className="feature-title">{m.label}</h4>
+                    <p className="feature-desc">{m.description}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Input Section */}
+            {/* ── Input ──────────────────────────────────── */}
             <div className="card">
               <div className="input-group">
                 <input
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="🔗 Paste URL TikTok di sini (vt.tiktok.com, vm.tiktok.com, tiktok.com)"
-                  className={`url-input ${darkMode ? '' : 'light'}`}
+                  onKeyDown={(e) => e.key === 'Enter' && handleDownload()}
+                  placeholder="Tempel URL TikTok — vt.tiktok.com, vm.tiktok.com …"
+                  className={`url-input${darkMode ? '' : ' light'}`}
                 />
-                <button
-                  onClick={handleDownload}
-                  disabled={loading}
-                  className="btn-primary"
-                >
+                <button onClick={handleDownload} disabled={loading} className="btn-primary">
                   {loading ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div className="loading-spinner"></div>
-                      Memproses...
-                    </div>
-                  ) : (
-                    `🚀 Download ${getMediaLabel(selectedMedia)}`
-                  )}
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span className="loading-spinner" />Memproses…
+                    </span>
+                  ) : `↓ ${getMediaLabel(selectedMedia)}`}
                 </button>
               </div>
-              
               {error && (
                 <div className="error-message">
-                  <span>⚠️</span>
-                  {error}
+                  <span style={{ fontSize: '16px' }}>!</span>{error}
                 </div>
               )}
             </div>
 
-            {/* Result Section untuk Video & Audio */}
+            {/* ── Result: Video / Audio ───────────────────── */}
             {downloadData && downloadData.type !== 'image' && (
               <div className="card">
                 <div className="success-header">
-                  <div className="success-icon">
-                    {getMediaIcon(downloadData.type)}
-                  </div>
+                  <div className="success-icon">{getMediaIcon(downloadData.type)}</div>
                   <div>
-                    <h3 className="success-title">
-                      {getMediaLabel(downloadData.type)} Siap Download!
-                    </h3>
-                    <p style={{ 
-                      color: 'rgba(255, 255, 255, 0.7)', 
-                      fontSize: '14px', 
-                      margin: '5px 0 0 0' 
-                    }}>
-                      Klik tombol di bawah untuk mulai mengunduh
-                    </p>
+                    <h3 className="success-title">{getMediaLabel(downloadData.type)} siap diunduh</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>Klik tombol di bawah untuk mulai mengunduh</p>
                   </div>
                 </div>
-                
-                {/* Media Info */}
-                <div style={{
-                  background: 'rgba(0, 242, 234, 0.1)',
-                  padding: '15px',
-                  borderRadius: '10px',
-                  marginBottom: '20px'
-                }}>
-                  <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-                    gap: '10px',
-                    textAlign: 'center'
-                  }}>
-                    <div>
-                      <strong style={{ color: '#00f2ea' }}>Jenis</strong>
-                      <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-                        {downloadData.type.toUpperCase()}
-                      </p>
+
+                {/* Info row */}
+                <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                  {[
+                    ['Format', downloadData.type === 'video' ? 'MP4' : 'MP3'],
+                    ['Kualitas', 'Original'],
+                    ...(downloadData.duration ? [['Durasi', `${Math.floor(downloadData.duration/60)}:${(downloadData.duration%60).toString().padStart(2,'0')}`]] : []),
+                  ].map(([k, v]) => (
+                    <div key={k} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', padding: '10px 16px', border: '1px solid var(--border)', textAlign: 'center', minWidth: '80px' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--accent-cyan)', marginBottom: '4px' }}>{k}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{v}</div>
                     </div>
-                    <div>
-                      <strong style={{ color: '#00f2ea' }}>Format</strong>
-                      <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-                        {downloadData.type === 'video' ? 'MP4' : 'MP3'}
-                      </p>
-                    </div>
-                    {downloadData.duration && (
-                      <div>
-                        <strong style={{ color: '#00f2ea' }}>Durasi</strong>
-                        <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-                          {Math.floor(downloadData.duration / 60)}:
-                          {(downloadData.duration % 60).toString().padStart(2, '0')}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
-                
-                {/* Thumbnail Preview */}
+
                 {downloadData.thumbnail && downloadData.type !== 'audio' && (
-                  <div className="thumbnail">
-                    <img src={downloadData.thumbnail} alt="Thumbnail" />
-                  </div>
+                  <div className="thumbnail"><img src={downloadData.thumbnail} alt="Preview" /></div>
                 )}
 
                 {downloadData.type === 'audio' && (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '30px',
-                    background: 'rgba(0, 242, 234, 0.1)',
-                    borderRadius: '15px',
-                    marginBottom: '20px',
-                    border: '2px dashed rgba(0, 242, 234, 0.3)'
-                  }}>
-                    <div style={{ fontSize: '4rem', marginBottom: '15px' }}>🎵</div>
-                    <p style={{ color: 'white', margin: 0, fontSize: '16px' }}>
-                      Audio TikTok siap untuk diunduh
-                    </p>
-                    <p style={{ color: 'rgba(255, 255, 255, 0.7)', margin: '5px 0 0 0', fontSize: '14px' }}>
-                      Format: MP3 • Kualitas: Original
-                    </p>
+                  <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface-2)', borderRadius: 'var(--radius-lg)', marginBottom: '20px', border: '1px dashed rgba(37,244,238,0.2)' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>♪</div>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Audio TikTok siap diunduh</p>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>MP3 · Kualitas Original</p>
                   </div>
                 )}
 
-                {/* Download Error Display */}
                 {downloadError && (
-                  <div style={{ 
-                    background: 'rgba(255, 100, 100, 0.2)',
-                    color: '#ff6b6b',
-                    padding: '15px',
-                    borderRadius: '10px',
-                    marginBottom: '20px',
-                    border: '1px solid rgba(255, 100, 100, 0.3)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <span style={{ fontSize: '18px' }}>❌</span>
-                      <div>
-                        <strong style={{ display: 'block', marginBottom: '5px' }}>
-                          Gagal Mengunduh
-                        </strong>
-                        <p style={{ margin: 0, fontSize: '14px' }}>{downloadError}</p>
-                        <p style={{ margin: '10px 0 0 0', fontSize: '12px', opacity: 0.8 }}>
-                          Tips: Coba gunakan "Buka di Tab Baru" atau periksa koneksi internet Anda.
-                        </p>
-                      </div>
-                    </div>
+                  <div style={{ background: 'rgba(254,44,85,0.06)', color: '#ff6b81', padding: '14px 18px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', border: '1px solid rgba(254,44,85,0.2)', fontSize: '13.5px' }}>
+                    ✕ &nbsp;{downloadError}
                   </div>
                 )}
 
-                {/* Download Progress Indicator */}
                 {isDownloading && (
-                  <div style={{
-                    background: 'rgba(0, 242, 234, 0.1)',
-                    padding: '15px',
-                    borderRadius: '10px',
-                    marginBottom: '20px',
-                    border: '1px solid rgba(0, 242, 234, 0.3)',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-                      <div className="loading-spinner" style={{ width: '20px', height: '20px' }}></div>
-                      <span style={{ color: '#00f2ea', fontWeight: '600' }}>
-                        Sedang mengunduh...
-                      </span>
-                    </div>
-                    <p style={{ color: 'rgba(255, 255, 255, 0.7)', margin: '10px 0 0 0', fontSize: '12px' }}>
-                      Harap tunggu, file sedang diproses. Jangan tutup halaman ini.
-                    </p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(37,244,238,0.06)', padding: '14px 18px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', border: '1px solid rgba(37,244,238,0.15)' }}>
+                    <span className="loading-spinner" />
+                    <span style={{ color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '14px' }}>Sedang mengunduh…</span>
                   </div>
                 )}
 
-                {/* Action Buttons */}
                 <div className="action-buttons">
                   <button
-                    id="download-btn"
-                    onClick={() => {
-                      const validationError = validateDownloadUrl(downloadData.url);
-                      if (validationError) {
-                        setDownloadError(validationError);
-                      } else {
-                        handleFileDownload(downloadData.url, getFilename(downloadData.type, downloadData.title));
-                      }
-                    }}
-                    className="btn-success"
-                    disabled={isDownloading}
+                    onClick={() => handleFileDownload(downloadData.url, getFilename(downloadData.type, downloadData.title))}
+                    className="btn-success" disabled={isDownloading}
                   >
-                    {isDownloading ? '⬇️ Mengunduh...' : `⬇️ Download ${getMediaLabel(downloadData.type)}`}
+                    {isDownloading ? '… Mengunduh' : `↓ ${labelBtn(downloadData.type)}`}
                   </button>
-
-                  <a
-                    href={downloadData.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-secondary"
-                    onClick={(e) => {
-                      const validationError = validateDownloadUrl(downloadData.url);
-                      if (validationError) {
-                        e.preventDefault();
-                        setDownloadError(validationError);
-                      }
-                    }}
-                  >
-                    🔗 Buka di Tab Baru
-                  </a>
-
-                  <button
-                    onClick={() => {
-                      setDownloadData(null);
-                      setDownloadError('');
-                    }}
-                    className="btn btn-secondary"
-                    style={{ background: 'rgba(255, 255, 255, 0.05)' }}
-                  >
-                    ✕ Tutup
-                  </button>
+                  <a href={downloadData.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">↗ Buka Tab Baru</a>
+                  <button onClick={() => { setDownloadData(null); setDownloadError(''); }} className="btn btn-secondary">✕ Tutup</button>
                 </div>
 
-                {/* Video Title */}
-                {downloadData.title && (
-                  <p className="video-title">
-                    "{downloadData.title}"
-                  </p>
+                {downloadData.title && <p className="video-title">"{downloadData.title}"</p>}
+              </div>
+            )}
+
+            {/* ── Result: Images ─────────────────────────── */}
+            {downloadData?.type === 'image' && downloadData.images && (
+              <div className="card">
+                <div className="success-header">
+                  <div className="success-icon">⊞</div>
+                  <div>
+                    <h3 className="success-title">{downloadData.images.length} Gambar Ditemukan</h3>
+                    <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>Pilih gambar yang ingin diunduh</p>
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px,1fr))', gap: '12px', marginBottom: '20px' }}>
+                  {downloadData.images.map((img, i) => (
+                    <div key={i} style={{ background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', padding: '12px', border: '1px solid var(--border)', textAlign: 'center' }}>
+                      <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', marginBottom: '10px', cursor: 'pointer' }} onClick={() => window.open(img, '_blank')}>
+                        <img src={img} alt={`Slide ${i+1}`} style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }} />
+                        <div style={{ position: 'absolute', top: '6px', left: '6px', background: 'rgba(0,0,0,0.65)', color: 'white', borderRadius: '4px', padding: '2px 7px', fontSize: '11px', fontWeight: 700 }}>{i+1}</div>
+                      </div>
+                      <button
+                        onClick={() => handleFileDownload(img, `${(downloadData.title||'tiktok').replace(/[^a-zA-Z0-9]/g,'_')}_${i+1}.jpg`)}
+                        style={{ width: '100%', padding: '8px', background: 'linear-gradient(135deg,var(--accent-cyan),#00c9c3)', color: '#080a0f', border: 'none', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '12px', fontWeight: 700, marginBottom: '6px' }}
+                      >↓ Unduh {i+1}</button>
+                      <button
+                        onClick={() => window.open(img,'_blank')}
+                        style={{ width: '100%', padding: '6px', background: 'var(--surface-3)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', cursor: 'pointer', fontSize: '11px' }}
+                      >↗ Lihat</button>
+                    </div>
+                  ))}
+                </div>
+
+                {downloadError && (
+                  <div style={{ background: 'rgba(254,44,85,0.06)', color: '#ff6b81', padding: '14px 18px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', border: '1px solid rgba(254,44,85,0.2)', fontSize: '13px' }}>✕ &nbsp;{downloadError}</div>
                 )}
+
+                {isDownloading && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(37,244,238,0.06)', padding: '14px 18px', borderRadius: 'var(--radius-sm)', marginBottom: '18px', border: '1px solid rgba(37,244,238,0.15)' }}>
+                    <span className="loading-spinner" />
+                    <span style={{ color: 'var(--accent-cyan)', fontWeight: 600, fontSize: '14px' }}>Mengunduh gambar…</span>
+                  </div>
+                )}
+
+                <div className="action-buttons">
+                  <button onClick={() => downloadAllImages(downloadData.images!, downloadData.title||'tiktok')} className="btn-success" disabled={isDownloading}>
+                    {isDownloading ? '… Mengunduh' : `↓ Unduh Semua (${downloadData.images.length})`}
+                  </button>
+                  <button onClick={() => { setDownloadData(null); setDownloadError(''); }} className="btn btn-secondary">✕ Tutup</button>
+                </div>
+
+                <div style={{ marginTop: '16px', padding: '12px 16px', background: 'var(--surface-2)', borderRadius: 'var(--radius-sm)', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Tips:</strong> Unduh satu per satu atau gunakan "Unduh Semua" untuk sekaligus.
+                </div>
+
+                {downloadData.title && <p className="video-title">"{downloadData.title}"</p>}
               </div>
             )}
 
-            {/* Result Section untuk Images */}
-{downloadData && downloadData.type === 'image' && downloadData.images && (
-  <div className="card">
-    <div className="success-header">
-      <div className="success-icon">
-        {getMediaIcon(downloadData.type)}
-      </div>
-      <div>
-        <h3 className="success-title">
-          {downloadData.images.length} Gambar Ditemukan!
-        </h3>
-        <p style={{ 
-          color: 'rgba(255, 255, 255, 0.7)', 
-          fontSize: '14px', 
-          margin: '5px 0 0 0' 
-        }}>
-          Pilih gambar yang ingin didownload
-        </p>
-      </div>
-    </div>
-    
-    {/* Media Info */}
-    <div style={{
-      background: 'rgba(0, 242, 234, 0.1)',
-      padding: '15px',
-      borderRadius: '10px',
-      marginBottom: '20px'
-    }}>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', 
-        gap: '10px',
-        textAlign: 'center'
-      }}>
-        <div>
-          <strong style={{ color: '#00f2ea' }}>Jenis</strong>
-          <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-            {downloadData.type.toUpperCase()}
-          </p>
-        </div>
-        <div>
-          <strong style={{ color: '#00f2ea' }}>Jumlah</strong>
-          <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-            {downloadData.images.length} Gambar
-          </p>
-        </div>
-        <div>
-          <strong style={{ color: '#00f2ea' }}>Format</strong>
-          <p style={{ color: 'white', margin: '5px 0 0 0' }}>
-            JPG
-          </p>
-        </div>
-      </div>
-    </div>
-    
-    {/* Image Gallery dengan Download Buttons */}
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-      gap: '15px',
-      marginBottom: '20px'
-    }}>
-      {downloadData.images.map((image, index) => (
-        <div key={index} style={{
-          background: 'rgba(255, 255, 255, 0.05)',
-          borderRadius: '12px',
-          padding: '15px',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          textAlign: 'center'
-        }}>
-          {/* Image Preview */}
-          <div style={{
-            position: 'relative',
-            borderRadius: '8px',
-            overflow: 'hidden',
-            marginBottom: '10px',
-            cursor: 'pointer'
-          }}>
-            <img 
-              src={image} 
-              alt={`Slide ${index + 1}`}
-              style={{ 
-                width: '100%',
-                height: '120px',
-                objectFit: 'cover',
-                display: 'block'
-              }}
-              onClick={() => window.open(image, '_blank')}
-            />
-            <div style={{
-              position: 'absolute',
-              top: '5px',
-              left: '5px',
-              background: 'rgba(0, 0, 0, 0.7)',
-              color: 'white',
-              borderRadius: '50%',
-              width: '25px',
-              height: '25px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              fontWeight: 'bold'
-            }}>
-              {index + 1}
-            </div>
-          </div>
-
-          {/* Download Button untuk Individual Image */}
-          <button
-            onClick={() => handleFileDownload(
-              image, 
-              `${downloadData.title || 'tiktok'}_gambar_${index + 1}.jpg`
-            )}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              background: 'linear-gradient(45deg, #00f2ea, #00b894)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: '600',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px'
-            }}
-          >
-            ⬇️ Download {index + 1}
-          </button>
-
-          {/* Quick View Link */}
-          <button
-            onClick={() => window.open(image, '_blank')}
-            style={{
-              width: '100%',
-              padding: '6px 12px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '11px',
-              marginTop: '5px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px'
-            }}
-          >
-            👁️ Lihat
-          </button>
-        </div>
-      ))}
-    </div>
-
-    {/* Download Error Display */}
-    {downloadError && (
-      <div style={{ 
-        background: 'rgba(255, 100, 100, 0.2)',
-        color: '#ff6b6b',
-        padding: '15px',
-        borderRadius: '10px',
-        marginBottom: '20px',
-        border: '1px solid rgba(255, 100, 100, 0.3)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-          <span style={{ fontSize: '18px' }}>❌</span>
-          <div>
-            <strong style={{ display: 'block', marginBottom: '5px' }}>
-              Gagal Mengunduh
-            </strong>
-            <p style={{ margin: 0, fontSize: '14px' }}>{downloadError}</p>
-          </div>
-        </div>
-      </div>
-    )}
-
-    {/* Download Progress Indicator */}
-    {isDownloading && (
-      <div style={{
-        background: 'rgba(0, 242, 234, 0.1)',
-        padding: '15px',
-        borderRadius: '10px',
-        marginBottom: '20px',
-        border: '1px solid rgba(0, 242, 234, 0.3)',
-        textAlign: 'center'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-          <div className="loading-spinner" style={{ width: '20px', height: '20px' }}></div>
-          <span style={{ color: '#00f2ea', fontWeight: '600' }}>
-            Sedang mengunduh gambar...
-          </span>
-        </div>
-      </div>
-    )}
-
-    {/* Bulk Action Buttons */}
-    <div className="action-buttons" style={{ justifyContent: 'center' }}>
-      <button
-        onClick={() => downloadAllImages(downloadData.images!, downloadData.title || 'tiktok')}
-        className="btn-success"
-        disabled={isDownloading}
-        style={{ minWidth: '200px' }}
-      >
-        {isDownloading ? '⬇️ Mengunduh...' : `⬇️ Download Semua (${downloadData.images.length})`}
-      </button>
-
-      <button
-        onClick={() => {
-          setDownloadData(null);
-          setDownloadError('');
-        }}
-        className="btn btn-secondary"
-        style={{ background: 'rgba(255, 255, 255, 0.05)' }}
-      >
-        ✕ Tutup
-      </button>
-    </div>
-
-    {/* Info Text */}
-    <div style={{
-      textAlign: 'center',
-      marginTop: '15px',
-      padding: '10px',
-      background: 'rgba(255, 255, 255, 0.05)',
-      borderRadius: '8px'
-    }}>
-      <p style={{ 
-        color: 'rgba(255, 255, 255, 0.7)', 
-        margin: 0, 
-        fontSize: '12px' 
-      }}>
-        💡 <strong>Tips:</strong> Klik tombol "Download" di bawah setiap gambar untuk download satu per satu, 
-        atau gunakan "Download Semua" untuk mendapatkan semua gambar sekaligus.
-      </p>
-    </div>
-
-    {/* Video Title */}
-    {downloadData.title && (
-      <p className="video-title">
-        "{downloadData.title}"
-      </p>
-    )}
-  </div>
-)}
-
-            {/* API for Developers Section */}
-            <div className="card" style={{ background: 'rgba(0, 242, 234, 0.05)', border: '1px solid rgba(0, 242, 234, 0.2)' }}>
-              <h3 className="success-title" style={{ textAlign: 'center', marginBottom: '8px' }}>
-                📡 API for Developers
-              </h3>
-              <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginBottom: '20px' }}>
-                Integrasikan TikTok Downloader langsung ke aplikasimu via REST API
-              </p>
-              <div style={{
-                background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '10px', padding: '14px 18px', marginBottom: '16px',
-                display: 'flex', alignItems: 'center', gap: '12px', fontFamily: 'monospace'
-              }}>
-                <span style={{ background: 'rgba(0,242,234,0.2)', color: '#00f2ea', borderRadius: '6px', padding: '3px 10px', fontWeight: 700, fontSize: '13px' }}>POST</span>
-                <code style={{ color: '#e0e0e0', fontSize: '14px' }}>/api/v1/media</code>
-              </div>
-              <pre style={{
-                background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)',
-                borderRadius: '10px', padding: '16px', fontSize: '12px', overflowX: 'auto',
-                color: '#cdd6f4', marginBottom: '20px', lineHeight: 1.7
-              }}>{`fetch('/api/v1/media', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ url: '<tiktok-url>', type: 'all' })
-})
-.then(r => r.json())
-.then(({ data }) => {
-  console.log(data.video.url);   // video link
-  console.log(data.audio.url);   // audio link
-  console.log(data.images.urls); // slideshow images
-});`}</pre>
-              <div style={{ textAlign: 'center' }}>
-                <a href="/api-docs" style={{
-                  display: 'inline-block', padding: '12px 32px',
-                  background: 'linear-gradient(135deg, #00f2ea, #00b894)',
-                  color: '#000', borderRadius: '10px', fontWeight: 700,
-                  textDecoration: 'none', fontSize: '14px'
-                }}>
-                  📄 Lihat Dokumentasi API Lengkap →
-                </a>
-              </div>
-            </div>
-
-            {/* Features Section */}
+            {/* ── Features ───────────────────────────────── */}
             <div className="card">
-              <h3 className="success-title" style={{ textAlign: 'center', marginBottom: '25px' }}>
-                🎯 Kenapa Pilih Kami?
-              </h3>
-              
+              <p style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '16px', textAlign: 'center' }}>Kenapa pilih kami</p>
               <div className="features-grid">
                 {[
-                  { icon: '🚀', title: 'Super Cepat', desc: 'Proses download dalam hitungan detik' },
-                  { icon: '🎨', title: 'HD Quality', desc: 'Kualitas terbaik tanpa watermark' },
-                  { icon: '🎵', title: 'Multiple Format', desc: 'Video, audio, dan gambar' },
-                  { icon: '💯', title: 'Gratis', desc: 'Tanpa biaya, tanpa registrasi' }
-                ].map((feature, index) => (
-                  <div key={index} className="feature-card">
-                    <div className="feature-icon">{feature.icon}</div>
-                    <h4 className="feature-title">{feature.title}</h4>
-                    <p className="feature-desc">{feature.desc}</p>
+                  { icon: '⚡', title: 'Super Cepat', desc: 'Proses dalam hitungan detik' },
+                  { icon: '✦', title: 'HD Quality', desc: 'Tanpa watermark, resolusi asli' },
+                  { icon: '◈', title: 'Multi Format', desc: 'Video, audio, dan gambar' },
+                  { icon: '◎', title: 'Gratis', desc: 'Tanpa biaya, tanpa registrasi' },
+                ].map((f, i) => (
+                  <div key={i} className="feature-card">
+                    <div className="feature-icon" style={{ fontSize: '1.4rem', color: 'var(--accent-cyan)' }}>{f.icon}</div>
+                    <h4 className="feature-title">{f.title}</h4>
+                    <p className="feature-desc">{f.desc}</p>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* History Sidebar */}
+          {/* ── History Sidebar ─────────────────────────── */}
           {showHistory && (
             <div className="history-sidebar">
               <div className="history-header">
-                <h3 className="history-title">📜 Riwayat Download</h3>
+                <h3 className="history-title">Riwayat Download</h3>
                 {downloadHistory.length > 0 && (
-                  <button
-                    onClick={clearHistory}
-                    className="btn-clear"
-                  >
-                    Hapus
-                  </button>
+                  <button onClick={() => setDownloadHistory([])} className="btn-clear">Hapus</button>
                 )}
               </div>
-
               <div className="history-list">
                 {downloadHistory.length === 0 ? (
-                  <div className="history-empty">
-                    📝 Belum ada riwayat download
-                  </div>
+                  <div className="history-empty">Belum ada riwayat.<br />Download pertamamu akan muncul di sini.</div>
                 ) : (
                   downloadHistory.map((item) => (
-                    <div
-                      key={item.id}
-                      className="history-item"
-                      onClick={() => window.open(item.url, '_blank')}
-                    >
+                    <div key={item.id} className="history-item" onClick={() => window.open(item.url,'_blank')}>
                       <div className="history-content">
-                        {item.thumbnail && item.type !== 'audio' && (
-                          <img 
-                            src={item.thumbnail} 
-                            alt="Thumb"
-                            className="history-thumb"
-                          />
-                        )}
-                        {item.type === 'audio' && (
-                          <div style={{
-                            width: '50px',
-                            height: '50px',
-                            background: 'rgba(0, 242, 234, 0.2)',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '20px'
-                          }}>
-                            🎵
-                          </div>
+                        {item.thumbnail && item.type !== 'audio' ? (
+                          <img src={item.thumbnail} alt="Thumb" className="history-thumb" />
+                        ) : (
+                          <div style={{ width: '44px', height: '44px', background: 'var(--surface-3)', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0 }}>♪</div>
                         )}
                         <div className="history-details">
-                          <p className="history-item-title">
-                            {item.title}
-                          </p>
-                          <p className="history-time">
-                            {formatTime(item.timestamp)}
-                          </p>
-                          <p className="history-type">
-                            {getMediaIcon(item.type)} {item.type.toUpperCase()}
-                          </p>
+                          <p className="history-item-title">{item.title}</p>
+                          <p className="history-time">{formatTime(item.timestamp)}</p>
+                          <p className="history-type">{item.type.toUpperCase()}</p>
                         </div>
                       </div>
                     </div>
@@ -1029,9 +395,8 @@ const downloadAllImages = async (images: string[], title: string) => {
           )}
         </div>
 
-        {/* Footer */}
         <div className="footer">
-          <p>© 2025 TikTok Downloader • Made with Nextjs by Ki</p>
+          © 2025 TikTok Downloader · Built with Next.js by Ki
         </div>
       </div>
     </div>
