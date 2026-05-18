@@ -360,12 +360,7 @@ const downloadAllImages = async (images: string[], title: string) => {
         {/* Top Bar */}
         <div className="top-bar">
           <div className="logo">
-            <div className="logo-icon">
-  <img 
-    src="https://uploader-omega-opal.vercel.app/file/BQACAgUAAxkDAAMWadM-qxzsizP6Gbly-ZB3ILz2iKEAAs8eAAIZ4phWhwvL9mYRcJk7BA" 
-    alt="logo"
-  />
-</div>
+            <div className="logo-icon">⬇️</div>
             <h1 className="title">TikTok Downloader</h1>
           </div>
 
@@ -377,6 +372,14 @@ const downloadAllImages = async (images: string[], title: string) => {
               📜 {showHistory ? 'Sembunyikan' : 'Riwayat'} 
               {downloadHistory.length > 0 && ` (${downloadHistory.length})`}
             </button>
+
+            <a
+              href="/api-docs"
+              className="btn btn-secondary"
+              style={{ textDecoration: 'none' }}
+            >
+              📡 API Docs
+            </a>
 
             <button
               onClick={() => setDarkMode(!darkMode)}
@@ -890,6 +893,49 @@ const downloadAllImages = async (images: string[], title: string) => {
     )}
   </div>
 )}
+
+            {/* API for Developers Section */}
+            <div className="card" style={{ background: 'rgba(0, 242, 234, 0.05)', border: '1px solid rgba(0, 242, 234, 0.2)' }}>
+              <h3 className="success-title" style={{ textAlign: 'center', marginBottom: '8px' }}>
+                📡 API for Developers
+              </h3>
+              <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.6)', fontSize: '14px', marginBottom: '20px' }}>
+                Integrasikan TikTok Downloader langsung ke aplikasimu via REST API
+              </p>
+              <div style={{
+                background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '10px', padding: '14px 18px', marginBottom: '16px',
+                display: 'flex', alignItems: 'center', gap: '12px', fontFamily: 'monospace'
+              }}>
+                <span style={{ background: 'rgba(0,242,234,0.2)', color: '#00f2ea', borderRadius: '6px', padding: '3px 10px', fontWeight: 700, fontSize: '13px' }}>POST</span>
+                <code style={{ color: '#e0e0e0', fontSize: '14px' }}>/api/v1/media</code>
+              </div>
+              <pre style={{
+                background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: '10px', padding: '16px', fontSize: '12px', overflowX: 'auto',
+                color: '#cdd6f4', marginBottom: '20px', lineHeight: 1.7
+              }}>{`fetch('/api/v1/media', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ url: '<tiktok-url>', type: 'all' })
+})
+.then(r => r.json())
+.then(({ data }) => {
+  console.log(data.video.url);   // video link
+  console.log(data.audio.url);   // audio link
+  console.log(data.images.urls); // slideshow images
+});`}</pre>
+              <div style={{ textAlign: 'center' }}>
+                <a href="/api-docs" style={{
+                  display: 'inline-block', padding: '12px 32px',
+                  background: 'linear-gradient(135deg, #00f2ea, #00b894)',
+                  color: '#000', borderRadius: '10px', fontWeight: 700,
+                  textDecoration: 'none', fontSize: '14px'
+                }}>
+                  📄 Lihat Dokumentasi API Lengkap →
+                </a>
+              </div>
+            </div>
 
             {/* Features Section */}
             <div className="card">
