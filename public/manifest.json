@@ -1,0 +1,14 @@
+{
+  "name": "TikTok Down",
+  "short_name": "TikTokDown",
+  "description": "Download TikTok video, audio, dan gambar tanpa watermark",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080a0f",
+  "theme_color": "#fe2c55",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
